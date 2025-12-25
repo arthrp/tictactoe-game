@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
-	"sync"
+
+	"github.com/redis/go-redis/v9"
 )
 
 const SIZE = 3
@@ -15,30 +17,43 @@ const (
 	PlayerX    Player = "X"
 	PlayerO    Player = "O"
 	WinnerX    Winner = Winner(PlayerX)
-	WinnerY    Winner = Winner(PlayerO)
+	WinnerO    Winner = Winner(PlayerO)
 	WinnerDraw Winner = "draw"
 )
 
-var (
-	board    [SIZE][SIZE]string
-	mutex    sync.Mutex
-	gameOver bool
-)
-
-func init() {
-	resetBoard()
+type GameState struct {
+	Board    [SIZE][SIZE]string `json:"board"`
+	GameOver bool               `json:"game_over"`
 }
 
-func resetBoard() {
-	for i := 0; i < SIZE; i++ {
-		for j := 0; j < SIZE; j++ {
-			board[i][j] = ""
-		}
+func GetGameState(apiKey string) (*GameState, error) {
+	val, err := redisClient.Get(ctx, "game:"+apiKey).Result()
+	if err == redis.Nil {
+		// If key doesn't exist, return a new game state
+		return &GameState{
+			Board:    [SIZE][SIZE]string{},
+			GameOver: false,
+		}, nil
+	} else if err != nil {
+		return nil, err
 	}
-	gameOver = false
+
+	var state GameState
+	if err := json.Unmarshal([]byte(val), &state); err != nil {
+		return nil, err
+	}
+	return &state, nil
 }
 
-func checkWinner() Winner {
+func SaveGameState(apiKey string, state *GameState) error {
+	data, err := json.Marshal(state)
+	if err != nil {
+		return err
+	}
+	return redisClient.Set(ctx, "game:"+apiKey, data, 0).Err()
+}
+
+func checkWinner(board [SIZE][SIZE]string) Winner {
 	// Check rows and columns
 	for i := 0; i < SIZE; i++ {
 		if board[i][0] != "" && board[i][0] == board[i][1] && board[i][1] == board[i][2] {
@@ -74,7 +89,7 @@ func checkWinner() Winner {
 	return ""
 }
 
-func aiMove() {
+func aiMove(board *[SIZE][SIZE]string) {
 	// Simple AI: Pick a random empty spot
 	type point struct{ x, y int }
 	var emptySpots []point
@@ -91,7 +106,7 @@ func aiMove() {
 		// Try to find a winning move first
 		for _, p := range emptySpots {
 			board[p.x][p.y] = "O"
-			if checkWinner() == "O" {
+			if checkWinner(*board) == "O" {
 				return
 			}
 			board[p.x][p.y] = "" // backtrack
@@ -100,7 +115,7 @@ func aiMove() {
 		// Try to block opponent winning move
 		for _, p := range emptySpots {
 			board[p.x][p.y] = "X"
-			if checkWinner() == "X" {
+			if checkWinner(*board) == "X" {
 				board[p.x][p.y] = "O" // Block
 				return
 			}
@@ -114,50 +129,67 @@ func aiMove() {
 	}
 }
 
-func ResetGame() [SIZE][SIZE]string {
-	mutex.Lock()
-	defer mutex.Unlock()
-	resetBoard()
-	return board
+func ResetGame(apiKey string) ([SIZE][SIZE]string, error) {
+	state := &GameState{
+		Board:    [SIZE][SIZE]string{},
+		GameOver: false,
+	}
+	if err := SaveGameState(apiKey, state); err != nil {
+		return state.Board, err
+	}
+	return state.Board, nil
 }
 
-func Play(x, y int) ([SIZE][SIZE]string, string, string, error) {
-	mutex.Lock()
-	defer mutex.Unlock()
+func Play(apiKey string, x, y int) ([SIZE][SIZE]string, string, string, error) {
+	state, err := GetGameState(apiKey)
+	if err != nil {
+		return [SIZE][SIZE]string{}, "", "", err
+	}
 
-	if gameOver {
-		resetBoard()
+	if state.GameOver {
+		state.Board = [SIZE][SIZE]string{}
+		state.GameOver = false
 	}
 
 	if x < 0 || x >= SIZE || y < 0 || y >= SIZE {
-		return board, "", "", fmt.Errorf("coordinates out of bounds")
+		return state.Board, "", "", fmt.Errorf("coordinates out of bounds")
 	}
 
-	if board[x][y] != "" {
-		return board, "", "", fmt.Errorf("cell already occupied")
+	if state.Board[x][y] != "" {
+		return state.Board, "", "", fmt.Errorf("cell already occupied")
 	}
 
 	// Player move
-	board[x][y] = "X"
-	winner := checkWinner()
+	state.Board[x][y] = "X"
+	winner := checkWinner(state.Board)
 
 	if winner != "" {
-		gameOver = true
+		state.GameOver = true
 		msg := formatWinMessage(winner)
-		return board, msg, "Game Over. Next move will start a new game.", nil
+		if err := SaveGameState(apiKey, state); err != nil {
+			return state.Board, msg, "Error saving game state", err
+		}
+		return state.Board, msg, "Game Over. Next move will start a new game.", nil
 	}
 
 	// AI move
-	aiMove()
-	winner = checkWinner()
+	aiMove(&state.Board)
+	winner = checkWinner(state.Board)
 
 	if winner != "" {
-		gameOver = true
+		state.GameOver = true
 		msg := formatWinMessage(winner)
-		return board, msg, "Game Over. Next move will start a new game.", nil
+		if err := SaveGameState(apiKey, state); err != nil {
+			return state.Board, msg, "Error saving game state", err
+		}
+		return state.Board, msg, "Game Over. Next move will start a new game.", nil
 	}
 
-	return board, "ongoing", "Your turn", nil
+	if err := SaveGameState(apiKey, state); err != nil {
+		return state.Board, "ongoing", "Error saving game state", err
+	}
+
+	return state.Board, "ongoing", "Your turn", nil
 }
 
 func formatWinMessage(winner Winner) string {

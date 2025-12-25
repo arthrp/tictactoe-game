@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:8.4-alpine
+    container_name: redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data    # persistence between container restarts
+    restart: unless-stopped
+
+volumes:
+  redis-data:

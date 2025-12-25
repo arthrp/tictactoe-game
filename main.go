@@ -1,14 +1,15 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
 type MoveRequest struct {
-	X int `json:"x" binding:"required,min=0,max=2"`
-	Y int `json:"y" binding:"required,min=0,max=2"`
+	X *int `json:"x" binding:"required,min=0,max=2"`
+	Y *int `json:"y" binding:"required,min=0,max=2"`
 }
 
 type GameResponse struct {
@@ -18,16 +19,48 @@ type GameResponse struct {
 }
 
 func main() {
+	// Initialize Redis and load API keys
+	if err := InitRedis("localhost:6379"); err != nil {
+		log.Fatalf("Could not initialize Redis: %v", err)
+	}
+
 	r := gin.Default()
 
+	// Apply AuthMiddleware to all routes
+	r.Use(AuthMiddleware())
+
+	r.GET("/state", func(c *gin.Context) {
+		apiKey := c.GetString("apiKey")
+		state, err := GetGameState(apiKey)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get game state"})
+			return
+		}
+
+		status := "ongoing"
+		if state.GameOver {
+			winner := checkWinner(state.Board)
+			if winner != "" {
+				status = formatWinMessage(winner)
+			}
+		}
+
+		c.JSON(http.StatusOK, GameResponse{
+			Board:  state.Board,
+			Status: status,
+		})
+	})
+
 	r.POST("/move", func(c *gin.Context) {
+		apiKey := c.GetString("apiKey")
 		var req MoveRequest
+
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid move coordinates. x and y must be 0-2."})
 			return
 		}
 
-		board, status, msg, err := Play(req.X, req.Y)
+		board, status, msg, err := Play(apiKey, *req.X, *req.Y)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -41,7 +74,12 @@ func main() {
 	})
 
 	r.POST("/reset", func(c *gin.Context) {
-		board := ResetGame()
+		apiKey := c.GetString("apiKey")
+		board, err := ResetGame(apiKey)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset game"})
+			return
+		}
 		c.JSON(http.StatusOK, gin.H{"message": "Game reset", "board": board})
 	})
 
