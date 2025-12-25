@@ -8,6 +8,17 @@ import (
 
 const SIZE = 3
 
+type Player string
+type Winner string
+
+const (
+	PlayerX    Player = "X"
+	PlayerO    Player = "O"
+	WinnerX    Winner = Winner(PlayerX)
+	WinnerY    Winner = Winner(PlayerO)
+	WinnerDraw Winner = "draw"
+)
+
 var (
 	board    [SIZE][SIZE]string
 	mutex    sync.Mutex
@@ -27,23 +38,23 @@ func resetBoard() {
 	gameOver = false
 }
 
-func checkWinner() string {
+func checkWinner() Winner {
 	// Check rows and columns
 	for i := 0; i < SIZE; i++ {
 		if board[i][0] != "" && board[i][0] == board[i][1] && board[i][1] == board[i][2] {
-			return board[i][0]
+			return Winner(board[i][0])
 		}
 		if board[0][i] != "" && board[0][i] == board[1][i] && board[1][i] == board[2][i] {
-			return board[0][i]
+			return Winner(board[0][i])
 		}
 	}
 
 	// Check diagonals
 	if board[0][0] != "" && board[0][0] == board[1][1] && board[1][1] == board[2][2] {
-		return board[0][0]
+		return Winner(board[0][0])
 	}
 	if board[0][2] != "" && board[0][2] == board[1][1] && board[1][1] == board[2][0] {
-		return board[0][2]
+		return Winner(board[0][2])
 	}
 
 	// Check draw
@@ -57,7 +68,7 @@ func checkWinner() string {
 		}
 	}
 	if isDraw {
-		return "draw"
+		return WinnerDraw
 	}
 
 	return ""
@@ -102,8 +113,6 @@ func aiMove() {
 		board[move.x][move.y] = "O"
 	}
 }
-
-// Public functions for main.go
 
 func ResetGame() [SIZE][SIZE]string {
 	mutex.Lock()
@@ -151,8 +160,8 @@ func Play(x, y int) ([SIZE][SIZE]string, string, string, error) {
 	return board, "ongoing", "Your turn", nil
 }
 
-func formatWinMessage(winner string) string {
-	if winner == "draw" {
+func formatWinMessage(winner Winner) string {
+	if winner == WinnerDraw {
 		return "It's a draw!"
 	}
 	return fmt.Sprintf("%s wins!", winner)
