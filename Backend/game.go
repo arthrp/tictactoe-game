@@ -169,7 +169,7 @@ func Play(apiKey string, x, y int) ([SIZE][SIZE]string, string, string, error) {
 		if err := SaveGameState(apiKey, state); err != nil {
 			return state.Board, msg, "Error saving game state", err
 		}
-		return state.Board, msg, "Game Over. Next move will start a new game.", nil
+		return state.Board, msg, "Game Over", nil
 	}
 
 	// AI move
@@ -182,7 +182,7 @@ func Play(apiKey string, x, y int) ([SIZE][SIZE]string, string, string, error) {
 		if err := SaveGameState(apiKey, state); err != nil {
 			return state.Board, msg, "Error saving game state", err
 		}
-		return state.Board, msg, "Game Over. Next move will start a new game.", nil
+		return state.Board, msg, "Game Over", nil
 	}
 
 	if err := SaveGameState(apiKey, state); err != nil {
