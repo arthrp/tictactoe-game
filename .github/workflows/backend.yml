@@ -8,12 +8,12 @@ on:
     branches: [ "master" ]
     paths:
       - 'Backend/**'
-      - .github/**'
+      - '.github/**'
   pull_request:
     branches: [ "master" ]
     paths:
       - 'Backend/**'
-      - .github/**'
+      - '.github/**'
 
 jobs:
 
