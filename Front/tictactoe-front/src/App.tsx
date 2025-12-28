@@ -18,12 +18,12 @@ function App() {
   ]);
   const [status, setStatus] = useState('ongoing');
   const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
   const fetchGameState = async (key: string) => {
     if (!key) return;
-    setLoading(true);
+    setIsLoading(true);
     setError('');
     try {
       const res = await fetch('/api/state', {
@@ -42,7 +42,7 @@ function App() {
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -53,7 +53,7 @@ function App() {
     }
     if (board[x][y] !== '' || status !== 'ongoing') return;
 
-    setLoading(true);
+    setIsLoading(true);
     setError('');
     try {
       const res = await fetch('/api/move', {
@@ -75,13 +75,13 @@ function App() {
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const handleReset = async () => {
     if (!apiKey) return;
-    setLoading(true);
+    setIsLoading(true);
     setError('');
     try {
       const res = await fetch('/api/reset', {
@@ -101,7 +101,7 @@ function App() {
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -153,10 +153,10 @@ function App() {
           placeholder="Enter your UUID API Key"
         />
         <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={() => fetchGameState(apiKey)} disabled={loading || !apiKey}>
+            <button onClick={() => fetchGameState(apiKey)} disabled={isLoading || !apiKey}>
             Load Game
             </button>
-            <button onClick={handleReset} disabled={loading || !apiKey}>
+            <button onClick={handleReset} disabled={isLoading || !apiKey}>
             Reset Game
             </button>
         </div>
