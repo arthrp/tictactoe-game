@@ -22,4 +22,8 @@ jobs:
         node-version: '22'
 
     - name: Install dependencies
-      run: cd Front && npm install
+      run: cd Front/tictactoe-front && npm install
+
+    - name: Build frontend
+      run: cd Front/tictactoe-front && npm run build
+        
