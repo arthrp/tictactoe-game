@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,7 +21,12 @@ type GameResponse struct {
 
 func main() {
 	// Initialize Redis and load API keys
-	if err := InitRedis("localhost:6379"); err != nil {
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+
+	if err := InitRedis(redisAddr); err != nil {
 		log.Fatalf("Could not initialize Redis: %v", err)
 	}
 
