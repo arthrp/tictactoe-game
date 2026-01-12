@@ -39,8 +39,11 @@ function App() {
       setBoard(data.board);
       setStatus(data.status);
       if (data.message) setMessage(data.message);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error){
+        setError(err.message);
+      }
+      else console.error(err);
     } finally {
       setIsLoading(false);
     }
@@ -72,8 +75,11 @@ function App() {
       setBoard(data.board);
       setStatus(data.status);
       setMessage(data.message);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error){
+        setError(err.message);
+      }
+      else console.error(err);
     } finally {
       setIsLoading(false);
     }
@@ -98,25 +104,15 @@ function App() {
       setBoard(data.board);
       setStatus('ongoing');
       setMessage(data.message);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error){
+        setError(err.message);
+      }
+      else console.error(err);
     } finally {
       setIsLoading(false);
     }
   };
-
-  // Fetch initial state when apiKey changes (debounced or on blur/enter could be better, 
-  // but let's just do it when they stop typing or we can add a "Load" button. 
-  // The requirement says "input field below the grid". 
-  // I'll make the input control the key and maybe a button to "Connect" or just use the key for requests.
-  // Ideally, we load state once a valid key is provided.
-  // For simplicity, I'll add a button "Load Game" or just rely on the first move/action.
-  // But to see the board state, we should probably fetch it.
-  
-  // Let's rely on a "Load / Refresh" button or just calling it on mount if we had a key.
-  // Since key is user input, let's auto-fetch when key is valid format? No, let's keep it simple with a button "Connect" or just let them play.
-  // Wait, if the user inputs the key, they might want to see the current state.
-  // I'll add a "Load Game" button next to the input.
 
   return (
     <div className="App">
