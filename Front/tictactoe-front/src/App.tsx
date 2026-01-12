@@ -21,11 +21,30 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const fetchGameState = async (key: string) => {
-    if (!key) return;
+  const handleError = (err: unknown) => {
+    if (err instanceof Error) {
+      setError(err.message);
+    } else {
+      console.error(err);
+      setError('An unexpected error occurred');
+    }
+  };
+
+  const callAPI = async (fn: () => Promise<void>) => {
     setIsLoading(true);
     setError('');
     try {
+      await fn();
+    } catch (err: unknown) {
+      handleError(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchGameState = async (key: string) => {
+    if (!key) return;
+    await callAPI(async () => {
       const res = await fetch('/api/state', {
         headers: {
           'x-api-key': key,
@@ -39,14 +58,7 @@ function App() {
       setBoard(data.board);
       setStatus(data.status);
       if (data.message) setMessage(data.message);
-    } catch (err: unknown) {
-      if (err instanceof Error){
-        setError(err.message);
-      }
-      else console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
 
   const handleMove = async (x: number, y: number) => {
@@ -56,9 +68,7 @@ function App() {
     }
     if (board[x][y] !== '' || status !== 'ongoing') return;
 
-    setIsLoading(true);
-    setError('');
-    try {
+    await callAPI(async () => {
       const res = await fetch('/api/move', {
         method: 'POST',
         headers: {
@@ -75,21 +85,12 @@ function App() {
       setBoard(data.board);
       setStatus(data.status);
       setMessage(data.message);
-    } catch (err: unknown) {
-      if (err instanceof Error){
-        setError(err.message);
-      }
-      else console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
 
   const handleReset = async () => {
     if (!apiKey) return;
-    setIsLoading(true);
-    setError('');
-    try {
+    await callAPI(async () => {
       const res = await fetch('/api/reset', {
         method: 'POST',
         headers: {
@@ -104,14 +105,7 @@ function App() {
       setBoard(data.board);
       setStatus('ongoing');
       setMessage(data.message);
-    } catch (err: unknown) {
-      if (err instanceof Error){
-        setError(err.message);
-      }
-      else console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
 
   return (
