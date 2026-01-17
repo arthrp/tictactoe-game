@@ -16,7 +16,7 @@ var (
 	ctx         = context.Background()
 )
 
-// InitRedis initializes the Redis client and loads API keys.
+// Initialize the Redis client and loads API keys.
 func InitRedis(addr string) error {
 	redisClient = redis.NewClient(&redis.Options{
 		Addr: addr,
@@ -30,7 +30,7 @@ func InitRedis(addr string) error {
 	return LoadAPIKeys()
 }
 
-// LoadAPIKeys loads API keys from Redis into memory.
+// Load API keys from Redis into memory.
 func LoadAPIKeys() error {
 	keys, err := redisClient.SMembers(ctx, "api_keys").Result()
 	if err != nil {
@@ -56,7 +56,7 @@ func isValidUUID(u string) bool {
 	return err == nil && parsed.Version() == 4
 }
 
-// AuthMiddleware checks for a valid API key in the x-api-key header.
+// Check for a valid API key in the x-api-key header.
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiKey := c.GetHeader("x-api-key")
