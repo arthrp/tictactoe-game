@@ -1,0 +1,48 @@
+stream_over_http_enabled: true
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9095
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        http:
+          endpoint: 0.0.0.0:4318
+        grpc:
+          endpoint: 0.0.0.0:4317
+
+ingester:
+  max_block_duration: 5m
+  lifecycler:
+    ring:
+      replication_factor: 1
+      kvstore:
+        store: inmemory
+
+compactor:
+  compaction:
+    block_retention: 1h
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /tmp/tempo/traces
+    wal:
+      path: /tmp/tempo/wal
+
+# For local/dev, we use an in-memory ring and the local-blocks processor (no Prometheus required).
+metrics_generator:
+  ring:
+    kvstore:
+      store: inmemory
+  storage:
+    path: /tmp/tempo/generator/wal
+  processor:
+    local_blocks: {}
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [local-blocks]

@@ -1,14 +1,18 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
 
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel"
 )
 
 const SIZE = 3
+
+var tracer = otel.Tracer("tictactoe-game")
 
 type Player string
 type Winner string
@@ -26,7 +30,10 @@ type GameState struct {
 	GameOver bool               `json:"game_over"`
 }
 
-func GetGameState(apiKey string) (*GameState, error) {
+func GetGameState(ctx context.Context, apiKey string) (*GameState, error) {
+	_, span := tracer.Start(ctx, "GetGameState")
+	defer span.End()
+
 	val, err := redisClient.Get(ctx, "game:"+apiKey).Result()
 	if err == redis.Nil {
 		// If key doesn't exist, return a new game state
@@ -45,7 +52,10 @@ func GetGameState(apiKey string) (*GameState, error) {
 	return &state, nil
 }
 
-func SaveGameState(apiKey string, state *GameState) error {
+func SaveGameState(ctx context.Context, apiKey string, state *GameState) error {
+	_, span := tracer.Start(ctx, "SaveGameState")
+	defer span.End()
+
 	data, err := json.Marshal(state)
 	if err != nil {
 		return err
@@ -89,7 +99,10 @@ func checkWinner(board [SIZE][SIZE]string) Winner {
 	return ""
 }
 
-func aiMove(board *[SIZE][SIZE]string) {
+func aiMove(ctx context.Context, board *[SIZE][SIZE]string) {
+	_, span := tracer.Start(ctx, "aiMove")
+	defer span.End()
+
 	// Simple AI: Pick a random empty spot
 	type point struct{ x, y int }
 	var emptySpots []point
@@ -129,19 +142,25 @@ func aiMove(board *[SIZE][SIZE]string) {
 	}
 }
 
-func ResetGame(apiKey string) ([SIZE][SIZE]string, error) {
+func ResetGame(ctx context.Context, apiKey string) ([SIZE][SIZE]string, error) {
+	ctx, span := tracer.Start(ctx, "ResetGame")
+	defer span.End()
+
 	state := &GameState{
 		Board:    [SIZE][SIZE]string{},
 		GameOver: false,
 	}
-	if err := SaveGameState(apiKey, state); err != nil {
+	if err := SaveGameState(ctx, apiKey, state); err != nil {
 		return state.Board, err
 	}
 	return state.Board, nil
 }
 
-func Play(apiKey string, x, y int) ([SIZE][SIZE]string, string, string, error) {
-	state, err := GetGameState(apiKey)
+func Play(ctx context.Context, apiKey string, x, y int) ([SIZE][SIZE]string, string, string, error) {
+	ctx, span := tracer.Start(ctx, "Play")
+	defer span.End()
+
+	state, err := GetGameState(ctx, apiKey)
 	if err != nil {
 		return [SIZE][SIZE]string{}, "", "", err
 	}
@@ -166,26 +185,26 @@ func Play(apiKey string, x, y int) ([SIZE][SIZE]string, string, string, error) {
 	if winner != "" {
 		state.GameOver = true
 		msg := formatWinMessage(winner)
-		if err := SaveGameState(apiKey, state); err != nil {
+		if err := SaveGameState(ctx, apiKey, state); err != nil {
 			return state.Board, msg, "Error saving game state", err
 		}
 		return state.Board, msg, "Game Over", nil
 	}
 
 	// AI move
-	aiMove(&state.Board)
+	aiMove(ctx, &state.Board)
 	winner = checkWinner(state.Board)
 
 	if winner != "" {
 		state.GameOver = true
 		msg := formatWinMessage(winner)
-		if err := SaveGameState(apiKey, state); err != nil {
+		if err := SaveGameState(ctx, apiKey, state); err != nil {
 			return state.Board, msg, "Error saving game state", err
 		}
 		return state.Board, msg, "Game Over", nil
 	}
 
-	if err := SaveGameState(apiKey, state); err != nil {
+	if err := SaveGameState(ctx, apiKey, state); err != nil {
 		return state.Board, "ongoing", "Error saving game state", err
 	}
 

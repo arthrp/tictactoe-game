@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 type MoveRequest struct {
@@ -20,6 +22,13 @@ type GameResponse struct {
 }
 
 func main() {
+	// Initialize Tracer
+	shutdown, err := initTracer()
+	if err != nil {
+		log.Fatalf("Could not initialize tracer: %v", err)
+	}
+	defer shutdown(context.Background())
+
 	// Initialize Redis and load API keys
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
@@ -32,12 +41,15 @@ func main() {
 
 	r := gin.Default()
 
+	// Add OpenTelemetry middleware
+	r.Use(otelgin.Middleware(getEnv("OTEL_SERVICE_NAME", "tictactoe-backend")))
+
 	// Apply AuthMiddleware to all routes
 	r.Use(AuthMiddleware())
 
 	r.GET("/state", func(c *gin.Context) {
 		apiKey := c.GetString("apiKey")
-		state, err := GetGameState(apiKey)
+		state, err := GetGameState(c.Request.Context(), apiKey)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get game state"})
 			return
@@ -66,7 +78,7 @@ func main() {
 			return
 		}
 
-		board, status, msg, err := Play(apiKey, *req.X, *req.Y)
+		board, status, msg, err := Play(c.Request.Context(), apiKey, *req.X, *req.Y)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -81,7 +93,7 @@ func main() {
 
 	r.POST("/reset", func(c *gin.Context) {
 		apiKey := c.GetString("apiKey")
-		board, err := ResetGame(apiKey)
+		board, err := ResetGame(c.Request.Context(), apiKey)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset game"})
 			return
